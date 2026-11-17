@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EduCert Maroc — Vérification de certificats</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+  <script>window.EDUCERT_PUBLIC_ORIGIN = window.location.origin;</script>
+  <style>
+    :root{font-family:Inter,Arial,sans-serif;color:#18252d;background:#f3f7f8;--green:#087f5b;--dark:#12343b;--line:#d8e3e5}
+    *{box-sizing:border-box}body{margin:0}header{background:linear-gradient(120deg,#0b4f52,#087f5b);color:white;padding:28px max(20px,calc((100% - 1180px)/2));display:flex;justify-content:space-between;gap:18px;align-items:center}h1{margin:0;font-size:28px}h2{margin-top:0;color:var(--dark)}h3{color:var(--dark);margin-bottom:8px}.sub{opacity:.85;margin:7px 0 0}.wrap{max-width:1180px;margin:22px auto;padding:0 18px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 5px 18px #153f4d0d}.full{grid-column:1/-1}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.field{flex:1;min-width:180px}label{display:block;font-weight:700;font-size:13px;margin:9px 0 5px}input,select,button{font:inherit;width:100%;padding:10px 11px;border:1px solid #b9cbd0;border-radius:8px;background:white}button{background:var(--green);border:0;color:white;font-weight:700;cursor:pointer}button.secondary{background:#e7f1f0;color:#07564d}button.danger{background:#b42318}button:disabled{opacity:.55;cursor:not-allowed}.small{font-size:12px;color:#587078}.status{padding:11px 13px;border-radius:9px;background:#edf7f4;margin:12px 0;white-space:pre-wrap}.error{background:#fff0ef;color:#9a251c}.success{background:#e8f7ee;color:#146337}.mono{font-family:ui-monospace,monospace;word-break:break-all}.badge{display:inline-block;border-radius:999px;padding:4px 9px;background:#e7f1f0;font-size:12px;font-weight:700}.hidden{display:none}.result{line-height:1.65;background:#f7fafb;border-radius:9px;padding:12px;margin-top:12px}.footer{color:#60767b;font-size:12px;text-align:center;padding:15px 0 30px}@media(max-width:780px){.grid{grid-template-columns:1fr}header{display:block}.wallet{margin-top:15px}}
+    body.qr-only-mode{min-height:100vh!important;display:flex!important;align-items:center;justify-content:center;background:#fff!important}body.qr-only-mode>*{display:none!important}body.qr-only-mode::before{content:'🏆';display:block!important;font-size:clamp(100px,25vw,220px);line-height:1}body.qr-only-mode.qr-invalid::before{content:'❌'}body.public-scan-mode .wrap>*{display:none!important}body.public-scan-mode .wrap>.grid{display:block!important}body.public-scan-mode .wrap>.grid>*{display:none!important}body.public-scan-mode .wrap>.grid>#publicReadCard{display:block!important}
+  </style>
+</head>
+<body>
+<header><div><h1>🎓 EduCert Maroc</h1><p class="sub">Preuve et vérification de certificats universitaires sur Ethereum</p></div><div class="wallet"><button id="connectBtn">Connecter MetaMask</button><div id="account" class="small"></div></div></header>
+<main class="wrap">
+  <div id="status" class="status">Connectez MetaMask sur le réseau Sepolia pour administrer le contrat. La consultation publique peut être faite après configuration de l'adresse du contrat.</div>
+  <section class="card"><h2>Configuration</h2><label>Adresse du contrat EduCert</label><input id="contractAddress" placeholder="0x..." value=""><p class="small">Réseau attendu : Sepolia (chainId 11155111). Contrat : <a id="contractLink" target="_blank" rel="noopener">Etherscan</a></p></section>
+  <section class="grid">
+    <div class="card"><h2>Administration nationale</h2><p class="small">Réservé à <span class="badge">nationalAdmin</span>.</p><label>ID université</label><input id="regUniId" placeholder="UM5R"><label>Adresse administrateur</label><input id="regUniAdmin" placeholder="0x..."><button id="registerUni">Enregistrer l'université</button><hr><label>Changer le statut</label><div class="row"><input id="statusUniId" placeholder="UM5R"><select id="statusValue"><option value="true">Active</option><option value="false">Inactive</option></select><button id="setStatus">Appliquer</button></div><hr><label>Changer l'administrateur</label><input id="changeUniId" placeholder="UM5R"><input id="changeUniAdmin" placeholder="0x..."><button id="changeAdmin">Changer l'administrateur</button></div>
+    <div class="card"><h2>Gestion des facultés</h2><p class="small">Connectez le portefeuille administrateur de l'université. Il crée les facultés et attribue les droits.</p><label>ID université</label><input id="facultyUniId" placeholder="UM5R"><label>ID faculté</label><input id="facultyId" placeholder="FAC-SCIENCES"><label>Adresse du responsable de faculté</label><input id="facultyMember" placeholder="0x..."><div class="row"><button id="registerFaculty">Enregistrer la faculté</button><select id="facultyStatus"><option value="true">Active</option><option value="false">Inactive</option></select><button id="setFacultyStatus" class="secondary">Changer le statut</button></div><label>Rôles d'accès</label><label><input id="roleIssue" type="checkbox"> Émettre des certificats</label><label><input id="roleRevoke" type="checkbox"> Révoquer des certificats</label><button id="setFacultyRoles">Enregistrer les droits</button><div id="facultyRead" class="result">Lecture faculté : —</div><button id="readFaculty" class="secondary">Lire les droits</button></div>
+    <div class="card full"><h2>Ancrer un certificat</h2><p class="small">Le fichier reste hors blockchain. Seul son hash SHA-256 est enregistré.</p><div class="grid"><div><label>Identifiant certificat</label><input id="certId" placeholder="DIPLOME-2026-0001"><label>ID université</label><input id="certUniId" placeholder="UM5R"><label>Version</label><input id="certVersion" type="number" min="1" value="1"></div><div><label>PDF du certificat</label><input id="certFile" type="file" accept=".pdf,application/pdf"><label>Ou hash SHA-256 (0x + 64 caractères hexadécimaux)</label><input id="certHash" placeholder="0x..."><button id="anchorCert">Calculer le hash et ancrer</button></div></div><div id="fileHash" class="result hidden"></div></div>
+    <div class="card"><h2>Révoquer un certificat</h2><label>Identifiant certificat</label><input id="revokeId" placeholder="DIPLOME-2026-0001"><label>Version</label><input id="revokeVersion" type="number" min="1" value="1"><button id="revokeCert" class="danger">Révoquer</button></div>
+    <div id="publicReadCard" class="card"><h2>Lecture et vérification publique</h2><label>Identifiant certificat</label><input id="readId" placeholder="DIPLOME-2026-0001"><label>Version (laisser vide pour la dernière)</label><input id="readVersion" type="number" min="1"><div class="row"><button id="readCert" class="secondary">Lire le certificat</button><button id="latestCert" class="secondary">Lire la dernière version</button></div><label>Hash à vérifier</label><input id="verifyHash" placeholder="0x..."><button id="verifyCert">Vérifier ce certificat</button><div id="certResult" class="result">Résultat : —</div></div>
+  </section>
+<section class="card full"><h2>QR de vérification publique</h2><p class="small">Générez une vignette QR à imprimer sur le diplôme. Le QR reprend automatiquement l’adresse de cette page. Le téléphone et le PC doivent être sur le même Wi-Fi.</p><div class="row"><button id="makeQr" class="secondary">Générer le QR du certificat lu</button><button id="copyQrLink" class="secondary">Copier le lien public</button></div><div id="qrBox" class="result" style="display:none;text-align:center"><div id="qrcode" style="display:inline-block;background:#fff;padding:10px"></div><p id="qrLink" class="mono small"></p></div></section>
+  <div class="footer">Les PDF et les données personnelles restent hors blockchain. EduCert utilise des empreintes SHA-256 et le réseau Ethereum Sepolia.</div>
+</main>
+<script>
+const C=window.EDUCERT_CONFIG||{};const ZERO='0x0000000000000000000000000000000000000000';
+const ABI=[
+ 'function nationalAdmin() view returns (address)','function universities(bytes32) view returns (address admin,bool active,bool exists)','function faculties(bytes32,bytes32) view returns (address admin,bool active,bool exists)','function facultyRoles(bytes32,address) view returns (uint8)','function facultyIds(bytes32,address) view returns (bytes32)','function latestVersion(bytes32) view returns (uint256)','function registerUniversity(bytes32,address)','function setUniversityStatus(bytes32,bool)','function setUniversityAdmin(bytes32,address)','function registerFaculty(bytes32,bytes32,address)','function setFacultyStatus(bytes32,bytes32,bool)','function setFacultyRoles(bytes32,bytes32,address,bool,bool)','function getFacultyAccess(bytes32,address) view returns (bytes32 facultyId,uint8 roles,bool active)','function anchorCertificate(bytes32,bytes32,bytes32,uint256)','function revokeCertificate(bytes32,uint256)','function getCertificate(bytes32,uint256) view returns (bytes32 documentHash,bytes32 universityId,address issuer,uint256 issuedAt,uint8 status,bool exists)','function getLatestVersion(bytes32) view returns (uint256)','function verifyCertificate(bytes32,uint256,bytes32) view returns (bool)'
+];
+let provider,signer,contract;
+const $=id=>document.getElementById(id); const setStatus=(msg,bad=false)=>{$('status').textContent=msg;$('status').className='status '+(bad?'error':'success')};
+function addr(){return $('contractAddress').value.trim()||C.contractAddress||ZERO} function id32(s){return ethers.id(s.trim())} function checkHash(h){if(!/^0x[0-9a-fA-F]{64}$/.test(h))throw Error('Le hash doit contenir 0x suivi de 64 caractères hexadécimaux.');return h}
+function ensureContract(){if(!contract||addr()===ZERO)throw Error('Configurez d’abord l’adresse réelle du contrat EduCert.');return contract}
+async function apiCall(path,options={}){if(!C.apiBase)return null;const r=await fetch(C.apiBase+path,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});if(!r.ok)throw Error('API SQLite : '+await r.text());return r.json()}
+async function connect(){if(!window.ethereum)throw Error('MetaMask n’est pas installé.');provider=new ethers.BrowserProvider(window.ethereum);await provider.send('eth_requestAccounts',[]);const net=await provider.getNetwork();if(Number(net.chainId)!==Number(C.chainId||11155111))throw Error('Sélectionnez le réseau Sepolia dans MetaMask.');signer=await provider.getSigner();contract=new ethers.Contract(addr(),ABI,signer);$('account').textContent='Connecté : '+(await signer.getAddress());setStatus('MetaMask connecté sur Sepolia.');}
+async function tx(action){try{setStatus('Transaction en attente dans MetaMask…');const t=await action();setStatus('Transaction envoyée : '+t.hash+'\n'+C.explorer+'/tx/'+t.hash);await t.wait();setStatus('Transaction confirmée : '+t.hash+'\n'+C.explorer+'/tx/'+t.hash);return t}catch(e){setStatus(e.shortMessage||e.reason||e.message||'Transaction refusée',true);throw e}}
+async function shaFile(file){const bytes=await file.arrayBuffer();const digest=await crypto.subtle.digest('SHA-256',bytes);return '0x'+Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('')}
+function setLink(){const a=addr();$('contractLink').href=a===ZERO?'#':C.explorer+'/address/'+a;$('contractLink').textContent=a===ZERO?'Adresse non configurée':a.slice(0,10)+'…'}
+async function readFaculty(){try{const c=ensureContract(),uid=id32($('facultyUniId').value),member=$('facultyMember').value.trim(),f=await c.faculties(uid,id32($('facultyId').value)),a=await c.getFacultyAccess(uid,member),roles=Number(a.roles);$('facultyRead').innerHTML='Responsable : <span class="mono">'+f.admin+'</span><br>Faculté active : '+f.active+'<br>Existe : '+f.exists+'<hr>Faculté de l\'adresse : <span class="mono">'+a.facultyId+'</span><br>Droits : '+roles+' — Émettre : '+((roles&1)!==0)+' — Révoquer : '+((roles&2)!==0)+'<br>Accès actif : '+a.active}catch(e){$('facultyRead').textContent=e.message}}
+async function readCert(version){const c=ensureContract(),cid=id32($('readId').value);const v=version||Number($('readVersion').value);if(!v)throw Error('Indiquez une version ou cliquez sur dernière version.');const x=await c.getCertificate(cid,v);const names=['NONE','ACTIVE','SUPERSEDED','REVOKED'];$('certResult').innerHTML='<b>Existe :</b> '+x.exists+'<br><b>Hash document :</b> <span class="mono">'+x.documentHash+'</span><br><b>Université :</b> <span class="mono">'+x.universityId+'</span><br><b>Émetteur :</b> <span class="mono">'+x.issuer+'</span><br><b>Version :</b> '+x[3]+'<br><b>Date :</b> '+(x.issuedAt>0?new Date(Number(x.issuedAt)*1000).toLocaleString():'—')+'<br><b>Statut :</b> '+names[Number(x.status)]}
+$('contractAddress').value=C.contractAddress||'';setLink();$('connectBtn').onclick=()=>connect();$('contractAddress').onchange=setLink;
+$('registerUni').onclick=()=>tx(()=>ensureContract().registerUniversity(id32($('regUniId').value),$('regUniAdmin').value.trim()));$('setStatus').onclick=()=>tx(()=>ensureContract().setUniversityStatus(id32($('statusUniId').value),$('statusValue').value==='true'));$('changeAdmin').onclick=()=>tx(()=>ensureContract().setUniversityAdmin(id32($('changeUniId').value),$('changeUniAdmin').value.trim()));$('registerFaculty').onclick=()=>tx(()=>ensureContract().registerFaculty(id32($('facultyUniId').value),id32($('facultyId').value),$('facultyMember').value.trim()));$('setFacultyStatus').onclick=()=>tx(()=>ensureContract().setFacultyStatus(id32($('facultyUniId').value),id32($('facultyId').value),$('facultyStatus').value==='true'));$('setFacultyRoles').onclick=()=>tx(()=>ensureContract().setFacultyRoles(id32($('facultyUniId').value),id32($('facultyId').value),$('facultyMember').value.trim(),$('roleIssue').checked,$('roleRevoke').checked));$('readFaculty').onclick=readFaculty;
+$('anchorCert').onclick=async()=>{try{let h=$('certHash').value.trim();const f=$('certFile').files[0];if(f)h=await shaFile(f);checkHash(h);$('fileHash').className='result';$('fileHash').textContent='SHA-256 : '+h;await tx(()=>ensureContract().anchorCertificate(id32($('certId').value),id32($('certUniId').value),h,Number($('certVersion').value)));}catch(e){setStatus(e.message,true)}};
+$('revokeCert').onclick=()=>tx(()=>ensureContract().revokeCertificate(id32($('revokeId').value),Number($('revokeVersion').value)));$('readCert').onclick=()=>readCert();$('latestCert').onclick=async()=>{try{const c=ensureContract(),v=await c.getLatestVersion(id32($('readId').value));$('readVersion').value=v;await readCert(Number(v));}catch(e){$('certResult').textContent=e.message}};$('verifyCert').onclick=async()=>{try{const c=ensureContract(),ok=await c.verifyCertificate(id32($('readId').value),Number($('readVersion').value),checkHash($('verifyHash').value.trim()));$('certResult').innerHTML=ok?'<b class="success">✅ Certificat valide et actif.</b>':'<b class="error">❌ Certificat invalide, révoqué ou hash différent.</b>'}catch(e){$('certResult').textContent=e.message}};
+// Synchronisation SQLite après confirmation de la transaction blockchain.
+const originalAnchor=$('anchorCert').onclick;
+$('anchorCert').onclick=async()=>{try{let h=$('certHash').value.trim();const f=$('certFile').files[0];if(f)h=await shaFile(f);checkHash(h);const cid=$('certId').value.trim(),uid=$('certUniId').value.trim(),ver=Number($('certVersion').value);$('fileHash').className='result';$('fileHash').textContent='SHA-256 : '+h;const t=await tx(()=>ensureContract().anchorCertificate(id32(cid),id32(uid),h,ver));await apiCall('/api/certificates',{method:'POST',body:JSON.stringify({certificate_id:cid,university_id:uid,faculty_id:null,version:ver,document_hash:h,issuer:await signer.getAddress(),tx_hash:t.hash})});}catch(e){setStatus(e.message,true)}};
+$('revokeCert').onclick=async()=>{try{const cid=$('revokeId').value.trim(),ver=Number($('revokeVersion').value);const t=await tx(()=>ensureContract().revokeCertificate(id32(cid),ver));await apiCall('/api/certificates/'+encodeURIComponent(cid)+'/'+ver+'/status',{method:'PATCH',body:JSON.stringify({status:'REVOKED',tx_hash:t.hash})});}catch(e){setStatus(e.message,true)}};
+</script>
+<script>
+// Lecture publique via RPC Sepolia : MetaMask n'est nécessaire que pour écrire.
+const publicRpc = new ethers.JsonRpcProvider(C.rpcUrl || 'https://ethereum-sepolia-rpc.publicnode.com');
+const publicContract = () => {
+  if (addr() === ZERO) throw Error('Configurez d’abord l’adresse réelle du contrat EduCert.');
+  return new ethers.Contract(addr(), ABI, publicRpc);
+};
+const publicReadCertificate = async (version) => {
+  const cid = id32($('readId').value);
+  const v = version || Number($('readVersion').value);
+  if (!v) throw Error('Indiquez une version ou cliquez sur dernière version.');
+  const x = await publicContract().getCertificate(cid, v);
+  const names = ['NONE', 'ACTIVE', 'SUPERSEDED', 'REVOKED'];
+  $('certResult').innerHTML = '<b>Existe :</b> '+x.exists+'<br><b>Hash document :</b> <span class="mono">'+x.documentHash+'</span><br><b>Université :</b> <span class="mono">'+x.universityId+'</span><br><b>Émetteur :</b> <span class="mono">'+x.issuer+'</span><br><b>Version :</b> '+v+'<br><b>Date :</b> '+(x.issuedAt > 0 ? new Date(Number(x.issuedAt)*1000).toLocaleString() : '—')+'<br><b>Statut :</b> '+names[Number(x.status)];
+};
+$('readCert').onclick = () => publicReadCertificate();
+$('latestCert').onclick = async () => { try { const v = await publicContract().getLatestVersion(id32($('readId').value)); if (Number(v) === 0) throw Error('Aucune version enregistrée.'); $('readVersion').value = v; await publicReadCertificate(Number(v)); } catch (e) { $('certResult').textContent = e.message; } };
+$('verifyCert').onclick = async () => { try { const v = Number($('readVersion').value); if (!v) throw Error('Indiquez une version ou lisez la dernière version.'); const ok = await publicContract().verifyCertificate(id32($('readId').value), v, checkHash($('verifyHash').value.trim())); $('certResult').innerHTML = ok ? '<b class="success">✅ Certificat valide et actif.</b>' : '<b class="error">❌ Certificat invalide, révoqué ou hash différent.</b>'; } catch (e) { $('certResult').textContent = e.message; } };
+</script>
+<script>
+// QR public : l'URL transporte uniquement l'identifiant, la version et l'empreinte du document.
+function exposeHashField() {
+  const input = $('verifyHash');
+  if (!input || input.dataset.educertEnhanced) return;
+  input.dataset.educertEnhanced = '1';
+  input.placeholder = 'Le hash sera rempli automatiquement après la lecture';
+  input.style.border = '2px solid #087f5b';
+  const note = document.createElement('p');
+  note.className = 'small';
+  note.textContent = 'Hash du document utilisé pour vérifier l’intégrité du certificat et générer le QR.';
+  input.parentNode.insertBefore(note, input.nextSibling);
+}
+function fillHashFromResult() {
+  const m = $('certResult').innerText.match(/Hash document\s*:\s*(0x[0-9a-fA-F]{64})/i);
+  if (m) { $('verifyHash').value = m[1]; $('verifyHash').dispatchEvent(new Event('input')); }
+}
+exposeHashField();
+$('readCert').addEventListener('click', () => setTimeout(fillHashFromResult, 500));
+$('latestCert').addEventListener('click', () => setTimeout(fillHashFromResult, 500));
+function publicCertificateUrl() {
+  // Adaptation directe de genererQRCode(idDiplome) de diplomeV2QR-PDF.html.
+  // EduCert ajoute version et hash pour permettre la vérification blockchain.
+  const cid = $('readId').value.trim();
+  if (!cid) throw Error('Lisez d’abord le certificat.');
+  const publicOrigin = window.EDUCERT_PUBLIC_ORIGIN || window.location.origin;
+  const url = new URL(publicOrigin + '/diplomeV2QR-pdf2.html', window.location.href);
+  url.search = new URLSearchParams({ id: cid }).toString();
+  url.hash = '';
+  return url.toString();
+}
+function makeQr() {
+  try {
+    const link = publicCertificateUrl();
+    const box = $('qrcode'); box.innerHTML = '';
+    if (typeof QRCode === 'undefined') throw Error('La bibliothèque QR n’est pas chargée. Rechargez la page.');
+    new QRCode(box, { text: link, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.M });
+    $('qrLink').textContent = link;
+    $('qrBox').style.display = 'block';
+  } catch (e) { setStatus(e.message, true); }
+}
+$('makeQr').onclick = makeQr;
+$('copyQrLink').onclick = async () => { try { await navigator.clipboard.writeText(publicCertificateUrl()); setStatus('Lien public copié.'); } catch (e) { setStatus(e.message, true); } };
+async function loadCertificateFromQr() {
+  const q = new URLSearchParams(window.location.search);
+  const cid = q.get('certificate') || q.get('id');
+  let version = q.get('version');
+  const hash = q.get('hash');
+  if (!cid) return;
+  document.body.classList.add('public-scan-mode');
+  if (!version) {
+    const latest = await publicContract().getLatestVersion(id32(cid));
+    version = String(latest);
+  }
+  // Le QR ouvre la page EduCert complète et affiche la fiche de vérification.
+  // Le mode minimal n'est pas activé : l'utilisateur doit voir les détails.
+  const qrOnly = false;
+  $('readId').value = cid; $('readVersion').value = version;
+  if (hash) $('verifyHash').value = hash;
+  try {
+    await publicReadCertificate(Number(version));
+    // Comme dans l'affichage manuel : le hash est également prérempli après
+    // l'ouverture d'un QR avec ?id=...
+    if (!hash) fillHashFromResult();
+    if (hash) {
+      const valid = await publicContract().verifyCertificate(id32(cid), Number(version), checkHash(hash));
+      if (qrOnly) document.body.classList.toggle('qr-invalid', !valid);
+      $('certResult').innerHTML = valid ? '<b class="success">✅ QR vérifié : certificat valide et actif.</b>' : '<b class="error">❌ QR vérifié : certificat invalide, révoqué ou empreinte différente.</b>';
+    }
+  } catch (e) { if (qrOnly) document.body.classList.add('qr-invalid'); $('certResult').textContent = e.message; }
+}
+window.addEventListener('load', loadCertificateFromQr);
+</script>
+<script>
+// Révocation : la blockchain est la source de vérité ; SQLite est synchronisée ensuite.
+$('revokeCert').onclick = async () => {
+  const cid = $('revokeId').value.trim(), ver = Number($('revokeVersion').value);
+  try {
+    if (!cid || !ver) throw Error('Renseignez l’identifiant et la version du certificat.');
+    const c = ensureContract();
+    const proof = await c.getCertificate(id32(cid), ver);
+    if (!proof.exists) throw Error('Certificat absent de la blockchain.');
+    const t = await tx(() => c.revokeCertificate(id32(cid), ver));
+    try {
+      await apiCall('/api/certificates/'+encodeURIComponent(cid)+'/'+ver+'/status', {method:'PATCH', body:JSON.stringify({status:'REVOKED', tx_hash:t.hash})});
+    } catch (patchError) {
+      // Si l’ancrage n’avait pas été synchronisé auparavant, créer la ligne SQLite maintenant.
+      if (String(patchError.message).includes('404')) {
+        await apiCall('/api/certificates', {method:'POST', body:JSON.stringify({certificate_id:cid, university_id:$('certUniId').value.trim() || 'UNKNOWN', faculty_id:null, version:ver, document_hash:proof.documentHash, issuer:proof.issuer, tx_hash:t.hash, status:'REVOKED'})});
+      } else throw patchError;
+    }
+    setStatus('Révocation confirmée sur Sepolia et synchronisée dans SQLite.\n'+t.hash);
+  } catch(e) { setStatus(e.shortMessage || e.reason || e.message || 'Révocation échouée', true); }
+};
+</script>
+</body></html>

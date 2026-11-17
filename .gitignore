@@ -1,0 +1,6 @@
+data/*.sqlite3
+data/*.sqlite3-*
+backups/
+.env
+__pycache__/
+*.py[cod]

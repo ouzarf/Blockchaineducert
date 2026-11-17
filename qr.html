@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EduCert</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
+<script src="config.js"></script>
+<style>html,body{margin:0;width:100%;height:100%;background:#fff}body{display:flex;align-items:center;justify-content:center}#result{font-size:clamp(120px,30vw,260px);line-height:1}</style>
+</head>
+<body><div id="result" aria-label="Résultat de vérification">…</div>
+<script>
+const ABI=['function verifyCertificate(bytes32,uint256,bytes32) view returns (bool)'];
+const q=new URLSearchParams(location.search), out=document.getElementById('result');
+async function verify(){
+  try{
+    const cid=q.get('certificate'), version=Number(q.get('version')), hash=q.get('hash');
+    if(!cid||!version||!/^0x[0-9a-fA-F]{64}$/.test(hash)) throw Error('invalid');
+    const provider=new ethers.JsonRpcProvider(window.EDUCERT_CONFIG.rpcUrl);
+    const contract=new ethers.Contract(window.EDUCERT_CONFIG.contractAddress,ABI,provider);
+    const valid=await contract.verifyCertificate(ethers.id(cid),version,hash);
+    out.textContent=valid?'🏆':'❌';
+  }catch(e){out.textContent='❌'}
+}
+verify();
+</script></body></html>
